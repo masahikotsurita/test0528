@@ -8,15 +8,23 @@ from pptx import Presentation
 from pptx.table import Table
 import configparser
 
+if os.name == 'nt':
+    try:
+        import ctypes
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+    except Exception:
+        pass
+
 # iniファイルからkeywordsとreplacementsを読み込む
 config = configparser.ConfigParser()
-# exe内かどうかを判断してiniの場所を動的に決定
+
+# 実行ファイルと同じディレクトリを基準とする
 if getattr(sys, 'frozen', False):
-    base_path = sys._MEIPASS  # PyInstaller実行環境
-    ini_path = os.path.join(os.path.dirname(sys.executable), '間違いやすい用語チェック.ini')
+    base_path = os.path.dirname(sys.executable)  # PyInstaller実行環境
 else:
     base_path = os.path.dirname(__file__)
-    ini_path = os.path.join(base_path, '間違いやすい用語チェック.ini')
+
+ini_path = os.path.join(base_path, '間違いやすい用語チェック.ini')
 config.read(ini_path, encoding='utf-8')
 
 keywords = []
@@ -27,7 +35,9 @@ if 'Replacements' in config:
         keywords.append(k)
         replacements.append(r)
 
-log_path = os.path.join(os.environ['TEMP'], f"ReplaceLog_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+# ログファイルは exe と同じディレクトリに保存する
+log_filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_ReplaceLog.txt"
+log_path = os.path.join(base_path, log_filename)
 
 def log(message):
     with open(log_path, 'a', encoding='utf-8') as f:
@@ -78,6 +88,10 @@ def search_text_in_pptx(path):
                                 log(f"スライド{i+1}: '{k}' → '{r}'")
 
 def process_files(filepaths):
+    # 処理対象のファイル一覧を冒頭に記録する
+    names = ', '.join(os.path.basename(p) for p in filepaths)
+    log(f"比較ファイル: {names}")
+    log("")
     for path in filepaths:
         ext = os.path.splitext(path)[1].lower()
         try:
