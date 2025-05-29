@@ -18,13 +18,25 @@ if os.name == 'nt':
 # iniファイルからkeywordsとreplacementsを読み込む
 config = configparser.ConfigParser()
 
-# 実行ファイルと同じディレクトリを基準とする
+# 実行ファイルの配置ディレクトリを基準とする
 if getattr(sys, 'frozen', False):
     base_path = os.path.dirname(sys.executable)  # PyInstaller実行環境
 else:
     base_path = os.path.dirname(__file__)
 
-ini_path = os.path.join(base_path, '間違いやすい用語チェック.ini')
+# PyInstallerの --add-data でバンドルされた ini も探索する
+ini_candidates = [os.path.join(base_path, '間違いやすい用語チェック.ini')]
+if getattr(sys, '_MEIPASS', None):
+    ini_candidates.append(os.path.join(sys._MEIPASS, '間違いやすい用語チェック.ini'))
+
+ini_path = None
+for p in ini_candidates:
+    if os.path.exists(p):
+        ini_path = p
+        break
+if ini_path is None:
+    ini_path = ini_candidates[0]
+
 config.read(ini_path, encoding='utf-8')
 
 keywords = []
