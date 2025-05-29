@@ -105,10 +105,13 @@ if __name__ == "__main__":
         input_files = sys.argv[1:]
         process_files(input_files)
     else:
-        print("Office ファイル（docx / xlsx / pptx）をドロップして入力してください：")
-        input_str = input("> ")
-        files = [f.strip() for f in input_str.split(',') if os.path.isfile(f.strip())]
-        if files:
-            process_files(files)
-        else:
-            print("有効なファイルが指定されていません。プログラムを終了します。")
+        message = (
+            "このプログラムは Office ファイル (docx / xlsx / pptx) を\n"
+            "この exe にドラッグアンドドロップして実行してください。"
+        )
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, message, "ファイル未指定", 0)
+        except Exception:
+            print(message)
+        sys.exit(0)
