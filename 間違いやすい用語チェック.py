@@ -136,12 +136,11 @@ def edit_ini(path):
             if not k or not v:
                 return
             config[sec][k] = v
-            with open(path, "w", encoding="utf-8") as f:
-                config.write(f)
             refresh_func()
             lb.yview_moveto(1)
             ek.delete(0, tk.END)
             ev.delete(0, tk.END)
+            ek.focus_set()
 
         def on_delete(event=None, sec=sec, lb=lb):
             if not lb.curselection():
@@ -149,11 +148,12 @@ def edit_ini(path):
             item = lb.get(lb.curselection()[0])
             k = item.split(" = ", 1)[0]
             config[sec].pop(k, None)
-            with open(path, "w", encoding="utf-8") as f:
-                config.write(f)
             top_fraction = lb.yview()[0]
             refresh_func()
             lb.yview_moveto(top_fraction)
+
+        ek.bind("<Return>", on_add_update)
+        ev.bind("<Return>", on_add_update)
 
         lb.bind("<<ListboxSelect>>", on_select)
 
@@ -192,7 +192,6 @@ def edit_ini(path):
     def on_del(event=None):
         widgets[current_section()]["on_delete"]()
 
-    root.bind("<Return>", on_add)
     root.bind("<Delete>", on_del)
     root.bind("<Control-s>", on_save)
 
