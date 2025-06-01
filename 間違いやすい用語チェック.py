@@ -233,16 +233,14 @@ def edit_ini(path):
 
 def search_text_in_docx(path, keywords, replacements):
     from docx import Document
-    from docx.oxml.table import CT_Tbl
     from docx.oxml.text.paragraph import CT_P
-    from docx.table import Table
     from docx.text.paragraph import Paragraph
 
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
     doc = Document(path)
     current_heading = "章番号不明"
 
-    for element in doc.element.body:
+    for element in doc.element.body.iter():
         if isinstance(element, CT_P):
             para = Paragraph(element, doc)
             if para.style.name.startswith("Heading"):
@@ -255,13 +253,6 @@ def search_text_in_docx(path, keywords, replacements):
             for k, r in zip(keywords, replacements):
                 if k in para.text:
                     log(f"{current_heading}: '{k}' → '{r}'")
-        elif isinstance(element, CT_Tbl):
-            table = Table(element, doc)
-            for row in table.rows:
-                for cell in row.cells:
-                    for k, r in zip(keywords, replacements):
-                        if k in cell.text:
-                            log(f"{current_heading}: '{k}' → '{r}'")
 
 def search_text_in_xlsx(path, keywords, replacements):
     from openpyxl import load_workbook
@@ -280,19 +271,25 @@ def search_text_in_pptx(path, keywords, replacements):
     from pptx.table import Table
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
     prs = Presentation(path)
-    for i, slide in enumerate(prs.slides):
-        for shape in slide.shapes:
+
+    def walk_shapes(shapes, slide_no):
+        for shape in shapes:
             if shape.has_text_frame:
                 for k, r in zip(keywords, replacements):
                     if k in shape.text:
-                        log(f"スライド{i+1}: '{k}' → '{r}'")
-            elif shape.has_table:
+                        log(f"スライド{slide_no}: '{k}' → '{r}'")
+            if shape.has_table:
                 table: Table = shape.table
                 for row in table.rows:
                     for cell in row.cells:
                         for k, r in zip(keywords, replacements):
                             if k in cell.text:
-                                log(f"スライド{i+1}: '{k}' → '{r}'")
+                                log(f"スライド{slide_no}: '{k}' → '{r}'")
+            if hasattr(shape, "shapes"):
+                walk_shapes(shape.shapes, slide_no)
+
+    for i, slide in enumerate(prs.slides, 1):
+        walk_shapes(slide.shapes, i)
 
 def search_text_in_txt(path, keywords, replacements):
     """Search keywords in a plain text file and log matches with line numbers."""
