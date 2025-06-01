@@ -2,6 +2,7 @@ import os
 import sys
 import datetime
 import configparser
+import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -58,6 +59,18 @@ def log(message):
     with open(log_path, 'a', encoding='utf-8') as f:
         f.write(f"{message}\n")
 
+def open_folder():
+    """Open the folder where this program resides."""
+    try:
+        if os.name == 'nt':
+            os.startfile(base_path)
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', base_path])
+        else:
+            subprocess.Popen(['xdg-open', base_path])
+    except Exception as e:
+        messagebox.showerror('エラー', f'フォルダを開けませんでした:\n{e}')
+
 def edit_ini(path):
     if os.path.exists(path):
         config.read(path, encoding="utf-8")
@@ -79,6 +92,7 @@ def edit_ini(path):
 
     root = tk.Tk()
     root.title("間違いやすい用語チェック.ini 編集")
+    tk.Button(root, text="フォルダを開く", command=open_folder).pack(anchor="ne", padx=10, pady=(10, 0))
 
     instructions = (
         "\n"
@@ -210,7 +224,7 @@ def edit_ini(path):
         config.setdefault("Settings", {})["ActiveReplacement"] = active_var.get()
         with open(path, "w", encoding="utf-8") as f:
             config.write(f)
-        root.destroy()
+        # 保存後もウインドウは閉じない
 
     def on_add(event=None):
         widgets[current_section()]["on_add"]()
@@ -227,7 +241,7 @@ def edit_ini(path):
     notebook.bind("<<NotebookTabChanged>>", focus_current)
     root.after(100, focus_current)
 
-    tk.Button(root, text="保存して終了", command=on_save).pack(pady=5)
+    tk.Button(root, text="保存", command=on_save).pack(pady=5)
 
     root.mainloop()
 
