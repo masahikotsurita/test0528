@@ -233,20 +233,35 @@ def edit_ini(path):
 
 def search_text_in_docx(path, keywords, replacements):
     from docx import Document
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
     doc = Document(path)
     current_heading = "章番号不明"
-    for para in doc.paragraphs:
-        if para.style.name.startswith("Heading"):
-            # 見出し段落の先頭番号を見出し番号として扱う（例: "1.1 概要" → "1.1"）
-            split_text = para.text.strip().split()
-            if split_text and any(char.isdigit() for char in split_text[0]):
-                current_heading = split_text[0]
-            else:
-                current_heading = para.text.strip()
-        for k, r in zip(keywords, replacements):
-            if k in para.text:
-                log(f"{current_heading}: '{k}' → '{r}'")
+
+    for element in doc.element.body:
+        if isinstance(element, CT_P):
+            para = Paragraph(element, doc)
+            if para.style.name.startswith("Heading"):
+                # 見出し段落の先頭番号を見出し番号として扱う（例: "1.1 概要" → "1.1"）
+                split_text = para.text.strip().split()
+                if split_text and any(char.isdigit() for char in split_text[0]):
+                    current_heading = split_text[0]
+                else:
+                    current_heading = para.text.strip()
+            for k, r in zip(keywords, replacements):
+                if k in para.text:
+                    log(f"{current_heading}: '{k}' → '{r}'")
+        elif isinstance(element, CT_Tbl):
+            table = Table(element, doc)
+            for row in table.rows:
+                for cell in row.cells:
+                    for k, r in zip(keywords, replacements):
+                        if k in cell.text:
+                            log(f"{current_heading}: '{k}' → '{r}'")
 
 def search_text_in_xlsx(path, keywords, replacements):
     from openpyxl import load_workbook

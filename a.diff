@@ -1,25 +1,80 @@
-diff --git a/README.md b/README.md
-index 0626f6c50e247bd3ad55bbc0882934585d1dfe5d..3a7441af204427e574f6f5eedcc9dc6ca7b66167 100644
---- a/README.md
-+++ b/README.md
-@@ -1,10 +1,12 @@
- # test0528
- Codex連携テストのため作成
- test
- 
- ## 更新履歴
- 
- * GUI 上の単語リストは追加・更新・削除ボタンを押したタイミングで即座に
-   反映されるように修正しました。保存ボタンを押すまでは ini ファイルは
-   書き換えられません。
-+* テキスト(.txt)ファイルも検索対象に追加し、マッチした行番号をログ出力
-+  するようにしました。
- 
 diff --git "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py" "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-index a184ccd94ef2c4809a27aa743cb08b3d2a4a058d..5643a57c50f39349ea394e0cad198535b84eac7f 100644
+index 5643a57c50f39349ea394e0cad198535b84eac7f..aee90d28da2dbe9d8f1bfa542043a4d9ead82b21 100644
 --- "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
 +++ "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-@@ -257,61 +257,74 @@ def search_text_in_xlsx(path, keywords, replacements):
+@@ -211,64 +211,79 @@ def edit_ini(path):
+         with open(path, "w", encoding="utf-8") as f:
+             config.write(f)
+         root.destroy()
+ 
+     def on_add(event=None):
+         widgets[current_section()]["on_add"]()
+ 
+     def on_del(event=None):
+         widgets[current_section()]["on_delete"]()
+ 
+     root.bind("<Delete>", on_del)
+     root.bind("<Control-s>", on_save)
+ 
+     def focus_current(event=None):
+         widgets[current_section()]["entry_key"].focus_set()
+ 
+     notebook.bind("<<NotebookTabChanged>>", focus_current)
+     root.after(100, focus_current)
+ 
+     tk.Button(root, text="保存して終了", command=on_save).pack(pady=5)
+ 
+     root.mainloop()
+ 
+ def search_text_in_docx(path, keywords, replacements):
+     from docx import Document
++    from docx.oxml.table import CT_Tbl
++    from docx.oxml.text.paragraph import CT_P
++    from docx.table import Table
++    from docx.text.paragraph import Paragraph
++
+     log(f"――――　ファイル: {os.path.basename(path)}　――――")
+     doc = Document(path)
+     current_heading = "章番号不明"
+-    for para in doc.paragraphs:
+-        if para.style.name.startswith("Heading"):
+-            # 見出し段落の先頭番号を見出し番号として扱う（例: "1.1 概要" → "1.1"）
+-            split_text = para.text.strip().split()
+-            if split_text and any(char.isdigit() for char in split_text[0]):
+-                current_heading = split_text[0]
+-            else:
+-                current_heading = para.text.strip()
+-        for k, r in zip(keywords, replacements):
+-            if k in para.text:
+-                log(f"{current_heading}: '{k}' → '{r}'")
++
++    for element in doc.element.body:
++        if isinstance(element, CT_P):
++            para = Paragraph(element, doc)
++            if para.style.name.startswith("Heading"):
++                # 見出し段落の先頭番号を見出し番号として扱う（例: "1.1 概要" → "1.1"）
++                split_text = para.text.strip().split()
++                if split_text and any(char.isdigit() for char in split_text[0]):
++                    current_heading = split_text[0]
++                else:
++                    current_heading = para.text.strip()
++            for k, r in zip(keywords, replacements):
++                if k in para.text:
++                    log(f"{current_heading}: '{k}' → '{r}'")
++        elif isinstance(element, CT_Tbl):
++            table = Table(element, doc)
++            for row in table.rows:
++                for cell in row.cells:
++                    for k, r in zip(keywords, replacements):
++                        if k in cell.text:
++                            log(f"{current_heading}: '{k}' → '{r}'")
+ 
+ def search_text_in_xlsx(path, keywords, replacements):
+     from openpyxl import load_workbook
+     log(f"――――　ファイル: {os.path.basename(path)}　――――")
+     wb = load_workbook(path)
+     for sheet in wb.worksheets:
+         for row in sheet.iter_rows():
              for cell in row:
                  if cell.value and isinstance(cell.value, str):
                      for k, r in zip(keywords, replacements):
@@ -38,59 +93,3 @@ index a184ccd94ef2c4809a27aa743cb08b3d2a4a058d..5643a57c50f39349ea394e0cad198535
                      if k in shape.text:
                          log(f"スライド{i+1}: '{k}' → '{r}'")
              elif shape.has_table:
-                 table: Table = shape.table
-                 for row in table.rows:
-                     for cell in row.cells:
-                         for k, r in zip(keywords, replacements):
-                             if k in cell.text:
-                                 log(f"スライド{i+1}: '{k}' → '{r}'")
- 
-+def search_text_in_txt(path, keywords, replacements):
-+    """Search keywords in a plain text file and log matches with line numbers."""
-+    log(f"――――　ファイル: {os.path.basename(path)}　――――")
-+    with open(path, encoding="utf-8", errors="ignore") as f:
-+        for lineno, line in enumerate(f, 1):
-+            for k, r in zip(keywords, replacements):
-+                if k in line:
-+                    log(f"行{lineno}: '{k}' → '{r}'")
-+
- def process_files(filepaths):
-     keywords, replacements = load_replacements()
-     # 処理対象のファイル一覧を冒頭に記録する
-     names = ', '.join(os.path.basename(p) for p in filepaths)
-     log(f"比較ファイル: {names}")
-     log("")
-     for path in filepaths:
-         ext = os.path.splitext(path)[1].lower()
-         try:
-             if ext == ".docx":
-                 search_text_in_docx(path, keywords, replacements)
-                 log("")
-                 log("")
-             elif ext == ".xlsx":
-                 search_text_in_xlsx(path, keywords, replacements)
-                 log("")
-                 log("")
-             elif ext == ".pptx":
-                 search_text_in_pptx(path, keywords, replacements)
-                 log("")
-                 log("")
-+            elif ext == ".txt":
-+                search_text_in_txt(path, keywords, replacements)
-+                log("")
-+                log("")
-             else:
-                 log(f"[SKIP] 未対応の拡張子: {path}")
-         except Exception as e:
-             log(f"[ERROR] {path} 処理中にエラー: {str(e)}")
- 
-     os.system(f"notepad.exe {log_path}")
- 
- if __name__ == "__main__":
-     if len(sys.argv) > 1 and os.path.exists(ini_path):
-         input_files = sys.argv[1:]
-         process_files(input_files)
-     else:
-         edit_ini(ini_path)
-         sys.exit(0)
- 
