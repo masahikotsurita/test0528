@@ -80,6 +80,16 @@ def edit_ini(path):
     root = tk.Tk()
     root.title("間違いやすい用語チェック.ini 編集")
 
+    instructions = (
+        "\n"
+        "実行方法：チェックしたいファイルをexeにドロップして実行します。\n\n"
+        "設定方法：ドロップせずに実行すると設定モード（この画面）が起動します。\n"
+        "　　　　　「選択中の単語グループ」の中の単語が検索対象になります。"
+        "\n"
+
+    )
+    tk.Label(root, text=instructions, justify="left").pack(padx=10, pady=(10, 0), anchor="w")
+
     style = ttk.Style()
     style.configure("Bold.TNotebook.Tab", padding=[6, 4])
     style.map(
