@@ -1,328 +1,107 @@
-diff --git "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.ini" "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.ini"
-index 151e7c8f411657953e38ddba9a915d10866de982..5617d87d12b8aadd898de7cf19a6700683260be8 100644
---- "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.ini"
-+++ "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.ini"
-@@ -1,19 +1,29 @@
--[Replacements]
-+[Replacement1]
- 下さい = ください
- 行なう = おこなう
- 予め = あらかじめ
- 切り替え = 切替え
- 通り = とおり
- 出来 = でき
- 有る = ある
- 更に = さらに
- 既に = すでに
- 易い = やすい
- 折返し = 折り返し
- コネクター = コネクタ
- ログイン = サインイン
- いたします = します
- ログオフ = サインアウト
- 安全にお使い頂くために = 安全にお使いいただくために
- クロス = インターリンク
+diff --git a/README.md b/README.md
+index 621873221fdcd2cf9990da2bd1c71c03b17f7ea7..0626f6c50e247bd3ad55bbc0882934585d1dfe5d 100644
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,10 @@
+ # test0528
+ Codex連携テストのため作成
+ test
  
-+[Replacement2]
++## 更新履歴
 +
-+[Replacement3]
++* GUI 上の単語リストは追加・更新・削除ボタンを押したタイミングで即座に
++  反映されるように修正しました。保存ボタンを押すまでは ini ファイルは
++  書き換えられません。
 +
-+[Replacement4]
-+
-+[Replacement5]
-+
-+[Settings]
-+ActiveReplacement = Replacement1
 diff --git "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py" "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-index 19cfec6713d80e90e1637725cf845dd6d4c8ade8..68a18943b345fff6cbf4a857cc15bf792c60ae68 100644
+index 628a71f0e08f4e47c051564439ab2c7b8be47760..a7e61366327f381cbc93ddb2a10e1660fb007247 100644
 --- "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
 +++ "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-@@ -1,156 +1,214 @@
- import os
- import sys
- import datetime
- import configparser
- import tkinter as tk
-+from tkinter import ttk
+@@ -114,67 +114,81 @@ def edit_ini(path):
+         tk.Label(frame, text="変更推奨ワード").grid(row=1, column=1, padx=5)
  
- if os.name == 'nt':
-     try:
-         import ctypes
-         ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
-     except Exception:
-         pass
+         ek = tk.Entry(frame)
+         ev = tk.Entry(frame)
+         ek.grid(row=2, column=0, padx=5, pady=5)
+         ev.grid(row=2, column=1, padx=5, pady=5)
  
- # iniファイルからkeywordsとreplacementsを読み込む
- config = configparser.ConfigParser()
+         refresh_func = make_refresh(sec, lb)
  
- # 実行ファイルの配置ディレクトリを基準とする
- if getattr(sys, 'frozen', False):
-     base_path = os.path.dirname(sys.executable)  # PyInstaller実行環境
- else:
-     base_path = os.path.dirname(__file__)
+         def on_select(event=None, lb=lb, ek=ek, ev=ev):
+             if not lb.curselection():
+                 return
+             item = lb.get(lb.curselection()[0])
+             k, v = item.split(" = ", 1)
+             ek.delete(0, tk.END)
+             ek.insert(0, k)
+             ev.delete(0, tk.END)
+             ev.insert(0, v)
  
- # PyInstallerの --add-data でバンドルされた ini も探索する
- ini_candidates = [os.path.join(base_path, '間違いやすい用語チェック.ini')]
- if getattr(sys, '_MEIPASS', None):
-     ini_candidates.append(os.path.join(sys._MEIPASS, '間違いやすい用語チェック.ini'))
- 
- ini_path = None
- for p in ini_candidates:
-     if os.path.exists(p):
-         ini_path = p
-         break
- if ini_path is None:
-     ini_path = ini_candidates[0]
- 
- def load_replacements():
--    config.read(ini_path, encoding='utf-8')
--    keywords = []
--    replacements = []
--    if 'Replacements' in config:
--        for k, r in config['Replacements'].items():
--            keywords.append(k)
--            replacements.append(r)
-+    """Load keywords and replacements from the selected section."""
-+    config.read(ini_path, encoding="utf-8")
+         def on_add_update(event=None, sec=sec, lb=lb, ek=ek, ev=ev):
+             k = ek.get().strip()
+             v = ev.get().strip()
+             if not k or not v:
+                 return
+             config[sec][k] = v
+-            refresh_func()
+-            lb.yview_moveto(1)
 +
-+    # Determine the active replacement section
-+    active = config.get("Settings", "ActiveReplacement", fallback="Replacement1")
-+    if active not in config:
-+        active = "Replacement1"
-+
-+    keywords, replacements = [], []
-+    for k, r in config.get(active, {}).items():
-+        keywords.append(k)
-+        replacements.append(r)
-+
-     return keywords, replacements
- 
- # ログファイルは exe と同じディレクトリに保存する
- log_filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_ReplaceLog.txt"
- log_path = os.path.join(base_path, log_filename)
- 
- def log(message):
-     with open(log_path, 'a', encoding='utf-8') as f:
-         f.write(f"{message}\n")
- 
- def edit_ini(path):
-     if os.path.exists(path):
--        config.read(path, encoding='utf-8')
--    if 'Replacements' not in config:
--        config['Replacements'] = {}
-+        config.read(path, encoding="utf-8")
-+
-+    # Upgrade old style section if necessary
-+    if "Replacements" in config and "Replacement1" not in config:
-+        config["Replacement1"] = {}
-+        for k, v in config["Replacements"].items():
-+            config["Replacement1"][k] = v
-+        config.remove_section("Replacements")
-+
-+    for i in range(1, 6):
-+        section = f"Replacement{i}"
-+        if section not in config:
-+            config[section] = {}
-+
-+    if "Settings" not in config:
-+        config["Settings"] = {"ActiveReplacement": "Replacement1"}
- 
-     root = tk.Tk()
--    root.title('間違いやすい用語チェック.ini 編集')
--
--    frame = tk.Frame(root)
--    frame.pack(padx=10, pady=10)
--
--    listbox = tk.Listbox(frame, width=50, height=15)
--    listbox.grid(row=0, column=0, columnspan=3, sticky='nsew')
--    scrollbar = tk.Scrollbar(frame, orient='vertical', command=listbox.yview)
--    scrollbar.grid(row=0, column=3, sticky='ns')
--    listbox.config(yscrollcommand=scrollbar.set)
--
--    entry_key = tk.Entry(frame)
--    entry_val = tk.Entry(frame)
--    entry_key.grid(row=1, column=0, padx=5, pady=5)
--    entry_val.grid(row=1, column=1, padx=5, pady=5)
--
--    def refresh():
--        listbox.delete(0, tk.END)
--        for k, v in config['Replacements'].items():
--            listbox.insert(tk.END, f'{k} = {v}')
--
--    def on_select(event=None):
--        if not listbox.curselection():
--            return
--        item = listbox.get(listbox.curselection()[0])
--        k, v = item.split(' = ', 1)
--        entry_key.delete(0, tk.END)
--        entry_key.insert(0, k)
--        entry_val.delete(0, tk.END)
--        entry_val.insert(0, v)
--
--    def on_add_update(event=None):
--        k = entry_key.get().strip()
--        v = entry_val.get().strip()
--        if not k or not v:
--            return
--        config['Replacements'][k] = v
--        refresh()
--        # After adding a new entry, move the scrollbar to the bottom so the
--        # newly added item is visible.
--        listbox.yview_moveto(1)
--        entry_key.delete(0, tk.END)
--        entry_val.delete(0, tk.END)
--
--    def on_delete(event=None):
--        if not listbox.curselection():
--            return
--        item = listbox.get(listbox.curselection()[0])
--        k = item.split(' = ', 1)[0]
--        config['Replacements'].pop(k, None)
--        # Preserve the current scrollbar position when deleting an entry so
--        # the list does not jump unexpectedly.
--        top_fraction = listbox.yview()[0]
--        refresh()
--        listbox.yview_moveto(top_fraction)
-+    root.title("間違いやすい用語チェック.ini 編集")
-+
-+    notebook = ttk.Notebook(root)
-+    notebook.pack(padx=10, pady=10)
-+
-+    widgets = {}
-+
-+    def make_refresh(sec, lb):
-+        def _refresh():
-+            lb.delete(0, tk.END)
-+            for k, v in config[sec].items():
++            # Update or append the item in the listbox directly
++            found = None
++            for i in range(lb.size()):
++                item_k = lb.get(i).split(" = ", 1)[0]
++                if item_k == k:
++                    found = i
++                    break
++            if found is not None:
++                lb.delete(found)
++                lb.insert(found, f"{k} = {v}")
++            else:
 +                lb.insert(tk.END, f"{k} = {v}")
-+        return _refresh
++                lb.yview_moveto(1)
 +
-+    for i in range(1, 6):
-+        sec = f"Replacement{i}"
-+        frame = tk.Frame(notebook)
-+        notebook.add(frame, text=sec)
-+
-+        lb = tk.Listbox(frame, width=50, height=15)
-+        lb.grid(row=0, column=0, columnspan=3, sticky="nsew")
-+        sb = tk.Scrollbar(frame, orient="vertical", command=lb.yview)
-+        sb.grid(row=0, column=3, sticky="ns")
-+        lb.config(yscrollcommand=sb.set)
-+
-+        ek = tk.Entry(frame)
-+        ev = tk.Entry(frame)
-+        ek.grid(row=1, column=0, padx=5, pady=5)
-+        ev.grid(row=1, column=1, padx=5, pady=5)
-+
-+        refresh_func = make_refresh(sec, lb)
-+
-+        def on_select(event=None, lb=lb, ek=ek, ev=ev):
-+            if not lb.curselection():
-+                return
-+            item = lb.get(lb.curselection()[0])
-+            k, v = item.split(" = ", 1)
-+            ek.delete(0, tk.END)
-+            ek.insert(0, k)
-+            ev.delete(0, tk.END)
-+            ev.insert(0, v)
-+
-+        def on_add_update(event=None, sec=sec, lb=lb, ek=ek, ev=ev):
-+            k = ek.get().strip()
-+            v = ev.get().strip()
-+            if not k or not v:
-+                return
-+            config[sec][k] = v
-+            refresh_func()
-+            lb.yview_moveto(1)
-+            ek.delete(0, tk.END)
-+            ev.delete(0, tk.END)
-+
-+        def on_delete(event=None, sec=sec, lb=lb):
-+            if not lb.curselection():
-+                return
-+            item = lb.get(lb.curselection()[0])
-+            k = item.split(" = ", 1)[0]
-+            config[sec].pop(k, None)
-+            top_fraction = lb.yview()[0]
-+            refresh_func()
-+            lb.yview_moveto(top_fraction)
-+
-+        lb.bind("<<ListboxSelect>>", on_select)
-+
-+        tk.Button(frame, text="追加/更新", command=on_add_update).grid(row=1, column=2, padx=5)
-+        tk.Button(frame, text="削除", command=on_delete).grid(row=2, column=2, padx=5)
-+
-+        widgets[sec] = {
-+            "entry_key": ek,
-+            "refresh": refresh_func,
-+            "on_add": on_add_update,
-+            "on_delete": on_delete,
-+        }
-+
-+        refresh_func()
-+
-+    active_var = tk.StringVar(value=config["Settings"].get("ActiveReplacement", "Replacement1"))
-+    selector = ttk.Combobox(root, textvariable=active_var, values=[f"Replacement{i}" for i in range(1, 6)], state="readonly")
-+    selector.pack(pady=5)
-+
-+    def current_section():
-+        idx = notebook.index(notebook.select())
-+        return f"Replacement{idx + 1}"
++            lb.update_idletasks()
+             ek.delete(0, tk.END)
+             ev.delete(0, tk.END)
+             ek.focus_set()
  
-     def on_save(event=None):
--        with open(path, 'w', encoding='utf-8') as f:
-+        config.setdefault("Settings", {})["ActiveReplacement"] = active_var.get()
-+        with open(path, "w", encoding="utf-8") as f:
-             config.write(f)
-         root.destroy()
+         def on_delete(event=None, sec=sec, lb=lb):
+             if not lb.curselection():
+                 return
+-            item = lb.get(lb.curselection()[0])
++            index = lb.curselection()[0]
++            item = lb.get(index)
+             if not messagebox.askyesno("削除確認", "選択した項目を削除しますか？"):
+                 return
+             k = item.split(" = ", 1)[0]
+             config[sec].pop(k, None)
+-            top_fraction = lb.yview()[0]
+-            refresh_func()
+-            lb.yview_moveto(top_fraction)
++            lb.delete(index)
++            lb.update_idletasks()
  
--    listbox.bind('<<ListboxSelect>>', on_select)
--    root.bind('<Return>', on_add_update)
--    root.bind('<Delete>', on_delete)
--    root.bind('<Control-s>', on_save)
-+    def on_add(event=None):
-+        widgets[current_section()]["on_add"]()
-+
-+    def on_del(event=None):
-+        widgets[current_section()]["on_delete"]()
-+
-+    root.bind("<Return>", on_add)
-+    root.bind("<Delete>", on_del)
-+    root.bind("<Control-s>", on_save)
-+
-+    def focus_current(event=None):
-+        widgets[current_section()]["entry_key"].focus_set()
-+
-+    notebook.bind("<<NotebookTabChanged>>", focus_current)
-+    root.after(100, focus_current)
+         ek.bind("<Return>", on_add_update)
+         ev.bind("<Return>", on_add_update)
  
--    tk.Button(frame, text='追加/更新', command=on_add_update).grid(row=1, column=2, padx=5)
--    tk.Button(frame, text='削除', command=on_delete).grid(row=2, column=2, padx=5)
--    tk.Button(frame, text='保存して終了', command=on_save).grid(row=3, column=2, padx=5)
-+    tk.Button(root, text="保存して終了", command=on_save).pack(pady=5)
+         lb.bind("<<ListboxSelect>>", on_select)
  
--    refresh()
-     root.mainloop()
+         btn_add = tk.Button(frame, text="追加/更新", width=10, command=on_add_update)
+         btn_add.grid(row=2, column=2, padx=5, pady=5)
+         btn_del = tk.Button(frame, text="削除", width=10, command=on_delete)
+         btn_del.grid(row=2, column=3, padx=5, pady=5)
  
- def search_text_in_docx(path, keywords, replacements):
-     from docx import Document
-     log(f"――――　ファイル: {os.path.basename(path)}　――――")
-     doc = Document(path)
-     current_heading = "章番号不明"
-     for para in doc.paragraphs:
-         if para.style.name.startswith("Heading"):
-             # 見出し段落の先頭番号を見出し番号として扱う（例: "1.1 概要" → "1.1"）
-             split_text = para.text.strip().split()
-             if split_text and any(char.isdigit() for char in split_text[0]):
-                 current_heading = split_text[0]
-             else:
-                 current_heading = para.text.strip()
-         for k, r in zip(keywords, replacements):
-             if k in para.text:
-                 log(f"{current_heading}: '{k}' → '{r}'")
+         widgets[sec] = {
+             "entry_key": ek,
+             "refresh": refresh_func,
+             "on_add": on_add_update,
+             "on_delete": on_delete,
+         }
  
- def search_text_in_xlsx(path, keywords, replacements):
-     from openpyxl import load_workbook
-     log(f"――――　ファイル: {os.path.basename(path)}　――――")
-     wb = load_workbook(path)
-     for sheet in wb.worksheets:
-         for row in sheet.iter_rows():
+         refresh_func()
+ 
+     active_var = tk.StringVar(value=config["Settings"].get("ActiveReplacement", "Replacement1"))
+     tk.Label(root, text="選択中の単語グループ").pack()
+     selector = ttk.Combobox(root, textvariable=active_var, values=[f"Replacement{i}" for i in range(1, 6)], state="readonly")
+     selector.pack(pady=5)
+ 

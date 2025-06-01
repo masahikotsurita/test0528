@@ -136,8 +136,22 @@ def edit_ini(path):
             if not k or not v:
                 return
             config[sec][k] = v
-            refresh_func()
-            lb.yview_moveto(1)
+
+            # Update or append the item in the listbox directly
+            found = None
+            for i in range(lb.size()):
+                item_k = lb.get(i).split(" = ", 1)[0]
+                if item_k == k:
+                    found = i
+                    break
+            if found is not None:
+                lb.delete(found)
+                lb.insert(found, f"{k} = {v}")
+            else:
+                lb.insert(tk.END, f"{k} = {v}")
+                lb.yview_moveto(1)
+
+            lb.update_idletasks()
             ek.delete(0, tk.END)
             ev.delete(0, tk.END)
             ek.focus_set()
@@ -145,14 +159,14 @@ def edit_ini(path):
         def on_delete(event=None, sec=sec, lb=lb):
             if not lb.curselection():
                 return
-            item = lb.get(lb.curselection()[0])
+            index = lb.curselection()[0]
+            item = lb.get(index)
             if not messagebox.askyesno("削除確認", "選択した項目を削除しますか？"):
                 return
             k = item.split(" = ", 1)[0]
             config[sec].pop(k, None)
-            top_fraction = lb.yview()[0]
-            refresh_func()
-            lb.yview_moveto(top_fraction)
+            lb.delete(index)
+            lb.update_idletasks()
 
         ek.bind("<Return>", on_add_update)
         ev.bind("<Return>", on_add_update)
