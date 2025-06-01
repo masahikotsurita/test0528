@@ -3,7 +3,7 @@ import sys
 import datetime
 import configparser
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 if os.name == 'nt':
     try:
@@ -80,14 +80,26 @@ def edit_ini(path):
     root = tk.Tk()
     root.title("間違いやすい用語チェック.ini 編集")
 
-    style = ttk.Style()
-    style.configure("Bold.TNotebook.Tab", padding=[6, 4])
-    style.map(
-        "Bold.TNotebook.Tab",
-        font=[("selected", ("TkDefaultFont", 9, "bold")), ("!selected", ("TkDefaultFont", 9, "normal"))],
-    )
+    tk.Label(
+        root,
+        text="実行方法　：　チェックしたいファイルをexeにドロップして実行します。",
+        anchor="w",
+    ).pack(fill="x", padx=10, pady=(10, 0))
+    tk.Label(
+        root,
+        text="設定方法　：　ドロップせずに実行すると設定モード（この画面）が起動します。",
+        anchor="w",
+    ).pack(fill="x", padx=10)
+    tk.Label(
+        root,
+        text="『選択中の単語グループ』の中の単語が検索対象になります。",
+        anchor="w",
+    ).pack(fill="x", padx=10, pady=(0, 10))
 
-    notebook = ttk.Notebook(root, style="Bold.TNotebook")
+    style = ttk.Style()
+    style.configure("Active.TNotebook.Tab", font=("TkDefaultFont", 9, "bold"))
+
+    notebook = ttk.Notebook(root)
     notebook.pack(padx=10, pady=10)
 
     widgets = {}
@@ -99,10 +111,13 @@ def edit_ini(path):
                 lb.insert(tk.END, f"{k} = {v}")
         return _refresh
 
+    active_section = config["Settings"].get("ActiveReplacement", "Replacement1")
+
     for i in range(1, 6):
         sec = f"Replacement{i}"
         frame = tk.Frame(notebook)
-        notebook.add(frame, text=sec)
+        tab_style = "Active.TNotebook.Tab" if sec == active_section else "TNotebook.Tab"
+        notebook.add(frame, text=sec, style=tab_style)
 
         lb = tk.Listbox(frame, width=50, height=15)
         lb.grid(row=0, column=0, columnspan=4, sticky="nsew")
@@ -136,21 +151,20 @@ def edit_ini(path):
             if not k or not v:
                 return
             config[sec][k] = v
-            with open(path, "w", encoding="utf-8") as f:
-                config.write(f)
             refresh_func()
             lb.yview_moveto(1)
             ek.delete(0, tk.END)
             ev.delete(0, tk.END)
+            ek.focus_set()
 
         def on_delete(event=None, sec=sec, lb=lb):
             if not lb.curselection():
                 return
             item = lb.get(lb.curselection()[0])
             k = item.split(" = ", 1)[0]
+            if not messagebox.askyesno("削除確認", f"'{k}' を削除しますか？"):
+                return
             config[sec].pop(k, None)
-            with open(path, "w", encoding="utf-8") as f:
-                config.write(f)
             top_fraction = lb.yview()[0]
             refresh_func()
             lb.yview_moveto(top_fraction)
@@ -161,6 +175,9 @@ def edit_ini(path):
         btn_add.grid(row=2, column=2, padx=5, pady=5)
         btn_del = tk.Button(frame, text="削除", width=10, command=on_delete)
         btn_del.grid(row=2, column=3, padx=5, pady=5)
+
+        ek.bind("<Return>", on_add_update)
+        ev.bind("<Return>", on_add_update)
 
         widgets[sec] = {
             "entry_key": ek,
@@ -176,6 +193,14 @@ def edit_ini(path):
     selector = ttk.Combobox(root, textvariable=active_var, values=[f"Replacement{i}" for i in range(1, 6)], state="readonly")
     selector.pack(pady=5)
 
+    def update_tab_styles(event=None):
+        for i in range(1, 6):
+            sec = f"Replacement{i}"
+            style_name = "Active.TNotebook.Tab" if sec == active_var.get() else "TNotebook.Tab"
+            notebook.tab(i - 1, style=style_name)
+    selector.bind("<<ComboboxSelected>>", update_tab_styles)
+    update_tab_styles()
+
     def current_section():
         idx = notebook.index(notebook.select())
         return f"Replacement{idx + 1}"
@@ -186,13 +211,9 @@ def edit_ini(path):
             config.write(f)
         root.destroy()
 
-    def on_add(event=None):
-        widgets[current_section()]["on_add"]()
-
     def on_del(event=None):
         widgets[current_section()]["on_delete"]()
 
-    root.bind("<Return>", on_add)
     root.bind("<Delete>", on_del)
     root.bind("<Control-s>", on_save)
 
