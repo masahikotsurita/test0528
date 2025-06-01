@@ -1,3 +1,4 @@
 # Use CRLF line endings for all text files
 * text eol=crlf
 
+*.exe binary

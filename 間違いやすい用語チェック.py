@@ -44,7 +44,7 @@ def load_replacements():
         active = "Replacement1"
 
     keywords, replacements = [], []
-    for k, r in config.get(active, {}).items():
+    for k, r in config.items(active):
         keywords.append(k)
         replacements.append(r)
 
@@ -80,7 +80,14 @@ def edit_ini(path):
     root = tk.Tk()
     root.title("間違いやすい用語チェック.ini 編集")
 
-    notebook = ttk.Notebook(root)
+    style = ttk.Style()
+    style.configure("Bold.TNotebook.Tab", padding=[6, 4])
+    style.map(
+        "Bold.TNotebook.Tab",
+        font=[("selected", ("TkDefaultFont", 9, "bold")), ("!selected", ("TkDefaultFont", 9, "normal"))],
+    )
+
+    notebook = ttk.Notebook(root, style="Bold.TNotebook")
     notebook.pack(padx=10, pady=10)
 
     widgets = {}
@@ -98,15 +105,18 @@ def edit_ini(path):
         notebook.add(frame, text=sec)
 
         lb = tk.Listbox(frame, width=50, height=15)
-        lb.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        lb.grid(row=0, column=0, columnspan=4, sticky="nsew")
         sb = tk.Scrollbar(frame, orient="vertical", command=lb.yview)
-        sb.grid(row=0, column=3, sticky="ns")
+        sb.grid(row=0, column=4, sticky="ns")
         lb.config(yscrollcommand=sb.set)
+
+        tk.Label(frame, text="検索ワード").grid(row=1, column=0, padx=5)
+        tk.Label(frame, text="変更推奨ワード").grid(row=1, column=1, padx=5)
 
         ek = tk.Entry(frame)
         ev = tk.Entry(frame)
-        ek.grid(row=1, column=0, padx=5, pady=5)
-        ev.grid(row=1, column=1, padx=5, pady=5)
+        ek.grid(row=2, column=0, padx=5, pady=5)
+        ev.grid(row=2, column=1, padx=5, pady=5)
 
         refresh_func = make_refresh(sec, lb)
 
@@ -126,6 +136,8 @@ def edit_ini(path):
             if not k or not v:
                 return
             config[sec][k] = v
+            with open(path, "w", encoding="utf-8") as f:
+                config.write(f)
             refresh_func()
             lb.yview_moveto(1)
             ek.delete(0, tk.END)
@@ -137,14 +149,18 @@ def edit_ini(path):
             item = lb.get(lb.curselection()[0])
             k = item.split(" = ", 1)[0]
             config[sec].pop(k, None)
+            with open(path, "w", encoding="utf-8") as f:
+                config.write(f)
             top_fraction = lb.yview()[0]
             refresh_func()
             lb.yview_moveto(top_fraction)
 
         lb.bind("<<ListboxSelect>>", on_select)
 
-        tk.Button(frame, text="追加/更新", command=on_add_update).grid(row=1, column=2, padx=5)
-        tk.Button(frame, text="削除", command=on_delete).grid(row=2, column=2, padx=5)
+        btn_add = tk.Button(frame, text="追加/更新", width=10, command=on_add_update)
+        btn_add.grid(row=2, column=2, padx=5, pady=5)
+        btn_del = tk.Button(frame, text="削除", width=10, command=on_delete)
+        btn_del.grid(row=2, column=3, padx=5, pady=5)
 
         widgets[sec] = {
             "entry_key": ek,
@@ -156,6 +172,7 @@ def edit_ini(path):
         refresh_func()
 
     active_var = tk.StringVar(value=config["Settings"].get("ActiveReplacement", "Replacement1"))
+    tk.Label(root, text="選択中の単語グループ").pack()
     selector = ttk.Combobox(root, textvariable=active_var, values=[f"Replacement{i}" for i in range(1, 6)], state="readonly")
     selector.pack(pady=5)
 
