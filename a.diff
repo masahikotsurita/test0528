@@ -1,62 +1,96 @@
+diff --git a/README.md b/README.md
+index 0626f6c50e247bd3ad55bbc0882934585d1dfe5d..3a7441af204427e574f6f5eedcc9dc6ca7b66167 100644
+--- a/README.md
++++ b/README.md
+@@ -1,10 +1,12 @@
+ # test0528
+ Codex連携テストのため作成
+ test
+ 
+ ## 更新履歴
+ 
+ * GUI 上の単語リストは追加・更新・削除ボタンを押したタイミングで即座に
+   反映されるように修正しました。保存ボタンを押すまでは ini ファイルは
+   書き換えられません。
++* テキスト(.txt)ファイルも検索対象に追加し、マッチした行番号をログ出力
++  するようにしました。
+ 
 diff --git "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py" "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-index a7e61366327f381cbc93ddb2a10e1660fb007247..e82e091f13b0d061328cbf785253af3f3553f77d 100644
+index a184ccd94ef2c4809a27aa743cb08b3d2a4a058d..5643a57c50f39349ea394e0cad198535b84eac7f 100644
 --- "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
 +++ "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
-@@ -58,50 +58,57 @@ def log(message):
-     with open(log_path, 'a', encoding='utf-8') as f:
-         f.write(f"{message}\n")
+@@ -257,61 +257,74 @@ def search_text_in_xlsx(path, keywords, replacements):
+             for cell in row:
+                 if cell.value and isinstance(cell.value, str):
+                     for k, r in zip(keywords, replacements):
+                         if k in cell.value:
+                             log(f"シート'{sheet.title}' セル{cell.coordinate}: '{k}' → '{r}'")
  
- def edit_ini(path):
-     if os.path.exists(path):
-         config.read(path, encoding="utf-8")
+ def search_text_in_pptx(path, keywords, replacements):
+     from pptx import Presentation
+     from pptx.table import Table
+     log(f"――――　ファイル: {os.path.basename(path)}　――――")
+     prs = Presentation(path)
+     for i, slide in enumerate(prs.slides):
+         for shape in slide.shapes:
+             if shape.has_text_frame:
+                 for k, r in zip(keywords, replacements):
+                     if k in shape.text:
+                         log(f"スライド{i+1}: '{k}' → '{r}'")
+             elif shape.has_table:
+                 table: Table = shape.table
+                 for row in table.rows:
+                     for cell in row.cells:
+                         for k, r in zip(keywords, replacements):
+                             if k in cell.text:
+                                 log(f"スライド{i+1}: '{k}' → '{r}'")
  
-     # Upgrade old style section if necessary
-     if "Replacements" in config and "Replacement1" not in config:
-         config["Replacement1"] = {}
-         for k, v in config["Replacements"].items():
-             config["Replacement1"][k] = v
-         config.remove_section("Replacements")
- 
-     for i in range(1, 6):
-         section = f"Replacement{i}"
-         if section not in config:
-             config[section] = {}
- 
-     if "Settings" not in config:
-         config["Settings"] = {"ActiveReplacement": "Replacement1"}
- 
-     root = tk.Tk()
-     root.title("間違いやすい用語チェック.ini 編集")
- 
-+    instructions = (
-+        "実行方法：チェックしたいファイルをexeにドロップして実行します。\n"
-+        "設定方法：ドロップせずに実行すると設定モード（この画面）が起動します。\n"
-+        "「選択中の単語グループ」の中の単語が検索対象になります。"
-+    )
-+    tk.Label(root, text=instructions, justify="left").pack(padx=10, pady=(10, 0), anchor="w")
++def search_text_in_txt(path, keywords, replacements):
++    """Search keywords in a plain text file and log matches with line numbers."""
++    log(f"――――　ファイル: {os.path.basename(path)}　――――")
++    with open(path, encoding="utf-8", errors="ignore") as f:
++        for lineno, line in enumerate(f, 1):
++            for k, r in zip(keywords, replacements):
++                if k in line:
++                    log(f"行{lineno}: '{k}' → '{r}'")
 +
-     style = ttk.Style()
-     style.configure("Bold.TNotebook.Tab", padding=[6, 4])
-     style.map(
-         "Bold.TNotebook.Tab",
-         font=[("selected", ("TkDefaultFont", 9, "bold")), ("!selected", ("TkDefaultFont", 9, "normal"))],
-     )
+ def process_files(filepaths):
+     keywords, replacements = load_replacements()
+     # 処理対象のファイル一覧を冒頭に記録する
+     names = ', '.join(os.path.basename(p) for p in filepaths)
+     log(f"比較ファイル: {names}")
+     log("")
+     for path in filepaths:
+         ext = os.path.splitext(path)[1].lower()
+         try:
+             if ext == ".docx":
+                 search_text_in_docx(path, keywords, replacements)
+                 log("")
+                 log("")
+             elif ext == ".xlsx":
+                 search_text_in_xlsx(path, keywords, replacements)
+                 log("")
+                 log("")
+             elif ext == ".pptx":
+                 search_text_in_pptx(path, keywords, replacements)
+                 log("")
+                 log("")
++            elif ext == ".txt":
++                search_text_in_txt(path, keywords, replacements)
++                log("")
++                log("")
+             else:
+                 log(f"[SKIP] 未対応の拡張子: {path}")
+         except Exception as e:
+             log(f"[ERROR] {path} 処理中にエラー: {str(e)}")
  
-     notebook = ttk.Notebook(root, style="Bold.TNotebook")
-     notebook.pack(padx=10, pady=10)
+     os.system(f"notepad.exe {log_path}")
  
-     widgets = {}
+ if __name__ == "__main__":
+     if len(sys.argv) > 1 and os.path.exists(ini_path):
+         input_files = sys.argv[1:]
+         process_files(input_files)
+     else:
+         edit_ini(ini_path)
+         sys.exit(0)
  
-     def make_refresh(sec, lb):
-         def _refresh():
-             lb.delete(0, tk.END)
-             for k, v in config[sec].items():
-                 lb.insert(tk.END, f"{k} = {v}")
-         return _refresh
- 
-     for i in range(1, 6):
-         sec = f"Replacement{i}"
-         frame = tk.Frame(notebook)
-         notebook.add(frame, text=sec)
- 
-         lb = tk.Listbox(frame, width=50, height=15)

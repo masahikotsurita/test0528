@@ -279,6 +279,15 @@ def search_text_in_pptx(path, keywords, replacements):
                             if k in cell.text:
                                 log(f"スライド{i+1}: '{k}' → '{r}'")
 
+def search_text_in_txt(path, keywords, replacements):
+    """Search keywords in a plain text file and log matches with line numbers."""
+    log(f"――――　ファイル: {os.path.basename(path)}　――――")
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        for lineno, line in enumerate(f, 1):
+            for k, r in zip(keywords, replacements):
+                if k in line:
+                    log(f"行{lineno}: '{k}' → '{r}'")
+
 def process_files(filepaths):
     keywords, replacements = load_replacements()
     # 処理対象のファイル一覧を冒頭に記録する
@@ -298,6 +307,10 @@ def process_files(filepaths):
                 log("")
             elif ext == ".pptx":
                 search_text_in_pptx(path, keywords, replacements)
+                log("")
+                log("")
+            elif ext == ".txt":
+                search_text_in_txt(path, keywords, replacements)
                 log("")
                 log("")
             else:
