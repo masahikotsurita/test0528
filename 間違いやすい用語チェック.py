@@ -3,7 +3,7 @@ import sys
 import datetime
 import configparser
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 if os.name == 'nt':
     try:
@@ -146,6 +146,8 @@ def edit_ini(path):
             if not lb.curselection():
                 return
             item = lb.get(lb.curselection()[0])
+            if not messagebox.askyesno("削除確認", "選択した項目を削除しますか？"):
+                return
             k = item.split(" = ", 1)[0]
             config[sec].pop(k, None)
             top_fraction = lb.yview()[0]
