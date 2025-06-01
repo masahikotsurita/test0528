@@ -1,0 +1,72 @@
+diff --git "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py" "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
+index b199527f04f0ac91972f817b3b5cb133c5d5b521..19cfec6713d80e90e1637725cf845dd6d4c8ade8 100644
+--- "a/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
++++ "b/\351\226\223\351\201\225\343\201\204\343\202\204\343\201\231\343\201\204\347\224\250\350\252\236\343\203\201\343\202\247\343\203\203\343\202\257.py"
+@@ -74,60 +74,67 @@ def edit_ini(path):
+     entry_key.grid(row=1, column=0, padx=5, pady=5)
+     entry_val.grid(row=1, column=1, padx=5, pady=5)
+ 
+     def refresh():
+         listbox.delete(0, tk.END)
+         for k, v in config['Replacements'].items():
+             listbox.insert(tk.END, f'{k} = {v}')
+ 
+     def on_select(event=None):
+         if not listbox.curselection():
+             return
+         item = listbox.get(listbox.curselection()[0])
+         k, v = item.split(' = ', 1)
+         entry_key.delete(0, tk.END)
+         entry_key.insert(0, k)
+         entry_val.delete(0, tk.END)
+         entry_val.insert(0, v)
+ 
+     def on_add_update(event=None):
+         k = entry_key.get().strip()
+         v = entry_val.get().strip()
+         if not k or not v:
+             return
+         config['Replacements'][k] = v
+         refresh()
++        # After adding a new entry, move the scrollbar to the bottom so the
++        # newly added item is visible.
++        listbox.yview_moveto(1)
+         entry_key.delete(0, tk.END)
+         entry_val.delete(0, tk.END)
+ 
+     def on_delete(event=None):
+         if not listbox.curselection():
+             return
+         item = listbox.get(listbox.curselection()[0])
+         k = item.split(' = ', 1)[0]
+         config['Replacements'].pop(k, None)
++        # Preserve the current scrollbar position when deleting an entry so
++        # the list does not jump unexpectedly.
++        top_fraction = listbox.yview()[0]
+         refresh()
++        listbox.yview_moveto(top_fraction)
+ 
+     def on_save(event=None):
+         with open(path, 'w', encoding='utf-8') as f:
+             config.write(f)
+         root.destroy()
+ 
+     listbox.bind('<<ListboxSelect>>', on_select)
+     root.bind('<Return>', on_add_update)
+     root.bind('<Delete>', on_delete)
+     root.bind('<Control-s>', on_save)
+ 
+     tk.Button(frame, text='追加/更新', command=on_add_update).grid(row=1, column=2, padx=5)
+     tk.Button(frame, text='削除', command=on_delete).grid(row=2, column=2, padx=5)
+     tk.Button(frame, text='保存して終了', command=on_save).grid(row=3, column=2, padx=5)
+ 
+     refresh()
+     root.mainloop()
+ 
+ def search_text_in_docx(path, keywords, replacements):
+     from docx import Document
+     log(f"――――　ファイル: {os.path.basename(path)}　――――")
+     doc = Document(path)
+     current_heading = "章番号不明"
+     for para in doc.paragraphs:
+         if para.style.name.startswith("Heading"):
