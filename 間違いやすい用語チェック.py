@@ -5,6 +5,7 @@ import configparser
 import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
+import re
 
 if os.name == 'nt':
     try:
@@ -245,7 +246,7 @@ def edit_ini(path):
 
     root.mainloop()
 
-def search_text_in_docx(path, keywords, replacements):
+def search_text_in_docx(path, pattern, repl_map):
     from docx import Document
     from docx.oxml.text.paragraph import CT_P
     from docx.text.paragraph import Paragraph
@@ -264,23 +265,23 @@ def search_text_in_docx(path, keywords, replacements):
                     current_heading = split_text[0]
                 else:
                     current_heading = para.text.strip()
-            for k, r in zip(keywords, replacements):
-                if k in para.text:
-                    log(f"{current_heading}: '{k}' → '{r}'")
+            for m in pattern.finditer(para.text):
+                k = m.group(0)
+                log(f"{current_heading}: '{k}' → '{repl_map[k]}'")
 
-def search_text_in_xlsx(path, keywords, replacements):
+def search_text_in_xlsx(path, pattern, repl_map):
     from openpyxl import load_workbook
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
-    wb = load_workbook(path)
+    wb = load_workbook(path, read_only=True, data_only=True)
     for sheet in wb.worksheets:
         for row in sheet.iter_rows():
             for cell in row:
                 if cell.value and isinstance(cell.value, str):
-                    for k, r in zip(keywords, replacements):
-                        if k in cell.value:
-                            log(f"シート'{sheet.title}' セル{cell.coordinate}: '{k}' → '{r}'")
+                    for m in pattern.finditer(cell.value):
+                        k = m.group(0)
+                        log(f"シート'{sheet.title}' セル{cell.coordinate}: '{k}' → '{repl_map[k]}'")
 
-def search_text_in_pptx(path, keywords, replacements):
+def search_text_in_pptx(path, pattern, repl_map):
     from pptx import Presentation
     from pptx.table import Table
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
@@ -289,33 +290,41 @@ def search_text_in_pptx(path, keywords, replacements):
     def walk_shapes(shapes, slide_no):
         for shape in shapes:
             if shape.has_text_frame:
-                for k, r in zip(keywords, replacements):
-                    if k in shape.text:
-                        log(f"スライド{slide_no}: '{k}' → '{r}'")
+                for m in pattern.finditer(shape.text):
+                    k = m.group(0)
+                    log(f"スライド{slide_no}: '{k}' → '{repl_map[k]}'")
             if shape.has_table:
                 table: Table = shape.table
                 for row in table.rows:
                     for cell in row.cells:
-                        for k, r in zip(keywords, replacements):
-                            if k in cell.text:
-                                log(f"スライド{slide_no}: '{k}' → '{r}'")
+                        for m in pattern.finditer(cell.text):
+                            k = m.group(0)
+                            log(f"スライド{slide_no}: '{k}' → '{repl_map[k]}'")
             if hasattr(shape, "shapes"):
                 walk_shapes(shape.shapes, slide_no)
 
     for i, slide in enumerate(prs.slides, 1):
         walk_shapes(slide.shapes, i)
 
-def search_text_in_txt(path, keywords, replacements):
+def search_text_in_txt(path, pattern, repl_map):
     """Search keywords in a plain text file and log matches with line numbers."""
     log(f"――――　ファイル: {os.path.basename(path)}　――――")
     with open(path, encoding="utf-8", errors="ignore") as f:
         for lineno, line in enumerate(f, 1):
-            for k, r in zip(keywords, replacements):
-                if k in line:
-                    log(f"行{lineno}: '{k}' → '{r}'")
+            for m in pattern.finditer(line):
+                k = m.group(0)
+                log(f"行{lineno}: '{k}' → '{repl_map[k]}'")
 
 def process_files(filepaths):
     keywords, replacements = load_replacements()
+    pairs = list(zip(keywords, replacements))
+    if not pairs:
+        log("キーワードが設定されていません")
+        return
+
+    repl_map = dict(pairs)
+    pattern = re.compile("|".join(re.escape(k) for k, _ in pairs))
+
     # 処理対象のファイル一覧を冒頭に記録する
     names = ', '.join(os.path.basename(p) for p in filepaths)
     log(f"比較ファイル: {names}")
@@ -324,19 +333,19 @@ def process_files(filepaths):
         ext = os.path.splitext(path)[1].lower()
         try:
             if ext == ".docx":
-                search_text_in_docx(path, keywords, replacements)
+                search_text_in_docx(path, pattern, repl_map)
                 log("")
                 log("")
             elif ext == ".xlsx":
-                search_text_in_xlsx(path, keywords, replacements)
+                search_text_in_xlsx(path, pattern, repl_map)
                 log("")
                 log("")
             elif ext == ".pptx":
-                search_text_in_pptx(path, keywords, replacements)
+                search_text_in_pptx(path, pattern, repl_map)
                 log("")
                 log("")
             elif ext == ".txt":
-                search_text_in_txt(path, keywords, replacements)
+                search_text_in_txt(path, pattern, repl_map)
                 log("")
                 log("")
             else:
