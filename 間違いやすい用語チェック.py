@@ -3,6 +3,7 @@ import sys
 import datetime
 import configparser
 import tkinter as tk
+from tkinter import ttk
 
 if os.name == 'nt':
     try:
@@ -34,13 +35,19 @@ if ini_path is None:
     ini_path = ini_candidates[0]
 
 def load_replacements():
-    config.read(ini_path, encoding='utf-8')
-    keywords = []
-    replacements = []
-    if 'Replacements' in config:
-        for k, r in config['Replacements'].items():
-            keywords.append(k)
-            replacements.append(r)
+    """Load keywords and replacements from the selected section."""
+    config.read(ini_path, encoding="utf-8")
+
+    # Determine the active replacement section
+    active = config.get("Settings", "ActiveReplacement", fallback="Replacement1")
+    if active not in config:
+        active = "Replacement1"
+
+    keywords, replacements = [], []
+    for k, r in config.get(active, {}).items():
+        keywords.append(k)
+        replacements.append(r)
+
     return keywords, replacements
 
 # ログファイルは exe と同じディレクトリに保存する
@@ -53,82 +60,133 @@ def log(message):
 
 def edit_ini(path):
     if os.path.exists(path):
-        config.read(path, encoding='utf-8')
-    if 'Replacements' not in config:
-        config['Replacements'] = {}
+        config.read(path, encoding="utf-8")
+
+    # Upgrade old style section if necessary
+    if "Replacements" in config and "Replacement1" not in config:
+        config["Replacement1"] = {}
+        for k, v in config["Replacements"].items():
+            config["Replacement1"][k] = v
+        config.remove_section("Replacements")
+
+    for i in range(1, 6):
+        section = f"Replacement{i}"
+        if section not in config:
+            config[section] = {}
+
+    if "Settings" not in config:
+        config["Settings"] = {"ActiveReplacement": "Replacement1"}
 
     root = tk.Tk()
-    root.title('間違いやすい用語チェック.ini 編集')
+    root.title("間違いやすい用語チェック.ini 編集")
 
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10)
+    notebook = ttk.Notebook(root)
+    notebook.pack(padx=10, pady=10)
 
-    listbox = tk.Listbox(frame, width=50, height=15)
-    listbox.grid(row=0, column=0, columnspan=3, sticky='nsew')
-    scrollbar = tk.Scrollbar(frame, orient='vertical', command=listbox.yview)
-    scrollbar.grid(row=0, column=3, sticky='ns')
-    listbox.config(yscrollcommand=scrollbar.set)
+    widgets = {}
 
-    entry_key = tk.Entry(frame)
-    entry_val = tk.Entry(frame)
-    entry_key.grid(row=1, column=0, padx=5, pady=5)
-    entry_val.grid(row=1, column=1, padx=5, pady=5)
+    def make_refresh(sec, lb):
+        def _refresh():
+            lb.delete(0, tk.END)
+            for k, v in config[sec].items():
+                lb.insert(tk.END, f"{k} = {v}")
+        return _refresh
 
-    def refresh():
-        listbox.delete(0, tk.END)
-        for k, v in config['Replacements'].items():
-            listbox.insert(tk.END, f'{k} = {v}')
+    for i in range(1, 6):
+        sec = f"Replacement{i}"
+        frame = tk.Frame(notebook)
+        notebook.add(frame, text=sec)
 
-    def on_select(event=None):
-        if not listbox.curselection():
-            return
-        item = listbox.get(listbox.curselection()[0])
-        k, v = item.split(' = ', 1)
-        entry_key.delete(0, tk.END)
-        entry_key.insert(0, k)
-        entry_val.delete(0, tk.END)
-        entry_val.insert(0, v)
+        lb = tk.Listbox(frame, width=50, height=15)
+        lb.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        sb = tk.Scrollbar(frame, orient="vertical", command=lb.yview)
+        sb.grid(row=0, column=3, sticky="ns")
+        lb.config(yscrollcommand=sb.set)
 
-    def on_add_update(event=None):
-        k = entry_key.get().strip()
-        v = entry_val.get().strip()
-        if not k or not v:
-            return
-        config['Replacements'][k] = v
-        refresh()
-        # After adding a new entry, move the scrollbar to the bottom so the
-        # newly added item is visible.
-        listbox.yview_moveto(1)
-        entry_key.delete(0, tk.END)
-        entry_val.delete(0, tk.END)
+        ek = tk.Entry(frame)
+        ev = tk.Entry(frame)
+        ek.grid(row=1, column=0, padx=5, pady=5)
+        ev.grid(row=1, column=1, padx=5, pady=5)
 
-    def on_delete(event=None):
-        if not listbox.curselection():
-            return
-        item = listbox.get(listbox.curselection()[0])
-        k = item.split(' = ', 1)[0]
-        config['Replacements'].pop(k, None)
-        # Preserve the current scrollbar position when deleting an entry so
-        # the list does not jump unexpectedly.
-        top_fraction = listbox.yview()[0]
-        refresh()
-        listbox.yview_moveto(top_fraction)
+        refresh_func = make_refresh(sec, lb)
+
+        def on_select(event=None, lb=lb, ek=ek, ev=ev):
+            if not lb.curselection():
+                return
+            item = lb.get(lb.curselection()[0])
+            k, v = item.split(" = ", 1)
+            ek.delete(0, tk.END)
+            ek.insert(0, k)
+            ev.delete(0, tk.END)
+            ev.insert(0, v)
+
+        def on_add_update(event=None, sec=sec, lb=lb, ek=ek, ev=ev):
+            k = ek.get().strip()
+            v = ev.get().strip()
+            if not k or not v:
+                return
+            config[sec][k] = v
+            refresh_func()
+            lb.yview_moveto(1)
+            ek.delete(0, tk.END)
+            ev.delete(0, tk.END)
+
+        def on_delete(event=None, sec=sec, lb=lb):
+            if not lb.curselection():
+                return
+            item = lb.get(lb.curselection()[0])
+            k = item.split(" = ", 1)[0]
+            config[sec].pop(k, None)
+            top_fraction = lb.yview()[0]
+            refresh_func()
+            lb.yview_moveto(top_fraction)
+
+        lb.bind("<<ListboxSelect>>", on_select)
+
+        tk.Button(frame, text="追加/更新", command=on_add_update).grid(row=1, column=2, padx=5)
+        tk.Button(frame, text="削除", command=on_delete).grid(row=2, column=2, padx=5)
+
+        widgets[sec] = {
+            "entry_key": ek,
+            "refresh": refresh_func,
+            "on_add": on_add_update,
+            "on_delete": on_delete,
+        }
+
+        refresh_func()
+
+    active_var = tk.StringVar(value=config["Settings"].get("ActiveReplacement", "Replacement1"))
+    selector = ttk.Combobox(root, textvariable=active_var, values=[f"Replacement{i}" for i in range(1, 6)], state="readonly")
+    selector.pack(pady=5)
+
+    def current_section():
+        idx = notebook.index(notebook.select())
+        return f"Replacement{idx + 1}"
 
     def on_save(event=None):
-        with open(path, 'w', encoding='utf-8') as f:
+        config.setdefault("Settings", {})["ActiveReplacement"] = active_var.get()
+        with open(path, "w", encoding="utf-8") as f:
             config.write(f)
         root.destroy()
 
-    listbox.bind('<<ListboxSelect>>', on_select)
-    root.bind('<Return>', on_add_update)
-    root.bind('<Delete>', on_delete)
-    root.bind('<Control-s>', on_save)
+    def on_add(event=None):
+        widgets[current_section()]["on_add"]()
 
-    tk.Button(frame, text='追加/更新', command=on_add_update).grid(row=1, column=2, padx=5)
-    tk.Button(frame, text='削除', command=on_delete).grid(row=2, column=2, padx=5)
-    tk.Button(frame, text='保存して終了', command=on_save).grid(row=3, column=2, padx=5)
+    def on_del(event=None):
+        widgets[current_section()]["on_delete"]()
 
-    refresh()
+    root.bind("<Return>", on_add)
+    root.bind("<Delete>", on_del)
+    root.bind("<Control-s>", on_save)
+
+    def focus_current(event=None):
+        widgets[current_section()]["entry_key"].focus_set()
+
+    notebook.bind("<<NotebookTabChanged>>", focus_current)
+    root.after(100, focus_current)
+
+    tk.Button(root, text="保存して終了", command=on_save).pack(pady=5)
+
     root.mainloop()
 
 def search_text_in_docx(path, keywords, replacements):
