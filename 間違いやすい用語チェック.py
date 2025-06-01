@@ -96,6 +96,9 @@ def edit_ini(path):
             return
         config['Replacements'][k] = v
         refresh()
+        # After adding a new entry, move the scrollbar to the bottom so the
+        # newly added item is visible.
+        listbox.yview_moveto(1)
         entry_key.delete(0, tk.END)
         entry_val.delete(0, tk.END)
 
@@ -105,7 +108,11 @@ def edit_ini(path):
         item = listbox.get(listbox.curselection()[0])
         k = item.split(' = ', 1)[0]
         config['Replacements'].pop(k, None)
+        # Preserve the current scrollbar position when deleting an entry so
+        # the list does not jump unexpectedly.
+        top_fraction = listbox.yview()[0]
         refresh()
+        listbox.yview_moveto(top_fraction)
 
     def on_save(event=None):
         with open(path, 'w', encoding='utf-8') as f:
